@@ -10,7 +10,7 @@ For an authorized first-run sample:
 python "<skill-dir>/scripts/read_foxmail_cache.py" --account-dir "<account storage folder>" --project-dir "<project>" --sync --initial-latest 3
 ```
 
-Without `--initial-latest`, the first sync baselines existing indexed messages. Later syncs process newly indexed records and changed imported records. The counter is a **local ID**, never an IMAP UID; `uid` and `uidvalidity` are null. Runtime state is `local_sources` in the shared `task-workspace/data/mail-reader-data.json`. The source currently uses account path plus store-generation bytes; moving the account changes its identity, so inspect migration/deduplication before switching paths.
+First sync imports records dated within the most recent calendar month and baselines older records. `--history-months 2` widens this to two months, including when backfilling an existing source. `--initial-latest N` further caps the selected window. Later syncs process newly indexed records and changed imported records. The experimental adapter must still scan local indexes to cross-validate its format; this is a record-import limit, not a guarantee of bounded index memory. Prefer IMAP server-side date filtering for very large mailboxes. The counter is a **local ID**, never an IMAP UID; `uid` and `uidvalidity` are null. Runtime state is `local_sources` in the shared `task-workspace/data/mail-reader-data.json`. The source currently uses account path plus store-generation bytes; moving the account changes its identity, so inspect migration/deduplication before switching paths.
 
 To explicitly import a previously established local-history baseline, use:
 

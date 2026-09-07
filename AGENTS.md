@@ -29,6 +29,7 @@ Turn information from any channel into human-readable, auditable, actionable tas
 - Direct prompt creation must preserve the user's intent, have the Agent write both a concise `title` and fuller `task_content`, record the stated source, and leave unknown dates/people empty. Do not invent channel messages or connectors.
 - Follow the canonical per-field writing contract in `skills/task-board/SKILL.md` for every source channel. In particular, `assigner` is a human-readable person name or organizational role; keep email addresses and account identifiers only in provenance fields.
 - Email imports must not prune manual tasks or other channels.
+- First mailbox import defaults to the most recent calendar month, including enabled Sent folders. Honor explicit user history requests directly (e.g. `--history-months 2`); this is a soft default, not a hard cap. Use the same flag for later backfills without resetting UID history. Prefer server-side date filtering for large mailboxes; routine later syncs remain UID-incremental.
 
 ## Boundaries
 

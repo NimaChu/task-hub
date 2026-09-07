@@ -62,7 +62,7 @@ An even shorter interactive option is `python "<skill-dir>\scripts\read_mail.py"
 
 Troubleshooting: `ERR.LOGIN.REQCODE` means this server requires a client authorization code. Guide generation/replacement through the official page, then retry locally with the code; do not keep retrying the login password. Distinguish a DNS/TLS failure, rejected authentication, disabled IMAP access, successful login, UID-baseline creation, and actual body/attachment retrieval in the result report.
 
-After a real successful sync, inspect the new-message records and refine tasks before importing them with the board skill. The default first sync only establishes a UID baseline; do not describe that as reading email bodies or validating task extraction. Use a subsequent new message, or explicitly authorized historical import, to exercise extraction.
+After a real successful sync, inspect the new-message records and refine tasks before importing them with the board skill. Default first sync reads only the most recent calendar month; honor an explicit wider request with `--history-months N`. Older configurations may explicitly select baseline-only mode: describe the actual result and do not claim a baseline-only connection read message bodies.
 
 When a credential-free Foxmail history is already present and a later IMAP bootstrap is used to recover attachments, import historical IMAP mail in a project-local staging project first. Then use `merge_imap_bootstrap.py` to copy verified attachment files and the mailbox UID cursor into the main project without importing duplicate messages or deterministic draft tasks:
 

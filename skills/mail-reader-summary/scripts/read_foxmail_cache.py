@@ -8,7 +8,7 @@ import re
 import struct
 from datetime import datetime, timedelta
 from pathlib import Path
-from read_mail import initialize, output_dir, read_json, write_json, utc_now, DATA_NAME
+from read_mail import initialize, output_dir, read_json, write_json, utc_now, DATA_NAME, history_cutoff
 
 
 def stable_read(path):
@@ -190,7 +190,7 @@ def inspect(root):
     return index[16:24].hex(), records, len(seen)
 
 
-def sync(project, root, latest, include_baseline=False):
+def sync(project, root, latest, include_baseline=False, history_months=None):
     generation, records, headers = inspect(root)
     initialize(project)
     path = output_dir(project)/DATA_NAME
@@ -206,11 +206,18 @@ def sync(project, root, latest, include_baseline=False):
     box=previous or {'generation':generation,'processed':{},'baseline_ids':[]}
     if previous is None:
         ordered=sorted(records,key=lambda r:(r['received_at'],r['local_id']))
-        selected=ordered[-latest:] if latest else []
+        cutoff = history_cutoff(history_months or 1)
+        selected = [r for r in ordered if r['received_at'][:10] >= cutoff]
+        if latest:
+            selected = selected[-latest:]
         chosen={r['local_id'] for r in selected}
         box['baseline_ids']=[r['local_id'] for r in records if r['local_id'] not in chosen]
     if include_baseline:
         box['baseline_ids'] = []
+    elif history_months is not None:
+        cutoff = history_cutoff(history_months)
+        eligible = {r['local_id'] for r in records if r['received_at'][:10] >= cutoff}
+        box['baseline_ids'] = [ident for ident in box['baseline_ids'] if ident not in eligible]
     new=0; changed=0
     for record in records:
         ident=str(record['local_id'])
@@ -241,13 +248,16 @@ if __name__=='__main__':
     parser.add_argument('--project-dir',default='.')
     parser.add_argument('--sync',action='store_true')
     parser.add_argument('--initial-latest',type=int,default=0)
+    parser.add_argument('--history-months', type=int, help='Read/backfill this many months; first import defaults to one')
     parser.add_argument('--include-baseline', action='store_true',
                         help='import historical local IDs previously recorded as the first-run baseline')
     args=parser.parse_args()
     if args.initial_latest<0: parser.error('initial-latest must be nonnegative')
+    if args.history_months is not None and args.history_months < 1:
+        parser.error('history-months must be positive')
     root=Path(args.account_dir).resolve()
     try:
-        if args.sync: result=sync(Path(args.project_dir).resolve(),root,args.initial_latest,args.include_baseline)
+        if args.sync: result=sync(Path(args.project_dir).resolve(),root,args.initial_latest,args.include_baseline,args.history_months)
         else:
             generation,records,total=inspect(root)
             result={'validated_messages':len(records),'header_records':total,

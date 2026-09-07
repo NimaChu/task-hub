@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import calendar
 import base64
 import email
 import getpass
@@ -15,7 +16,7 @@ import re
 import shutil
 import sys
 import zipfile
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from email.header import decode_header
 from email.message import Message
 from email.utils import getaddresses, parsedate_to_datetime
@@ -315,7 +316,21 @@ def discover_sent(config: dict, username: str, password: str) -> str:
             pass
 
 
-def sync(project: Path, prompt_credentials: bool = False, initial_latest: int = 0) -> str:
+def history_cutoff(months: int, today: date | None = None) -> str:
+    if isinstance(months, bool) or not isinstance(months, int) or months < 1:
+        raise ValueError('history months must be a positive integer')
+    today = today or date.today()
+    year, month0 = divmod(today.year * 12 + today.month - 1 - months, 12)
+    return date(year, month0 + 1, min(today.day, calendar.monthrange(year, month0 + 1)[1])).isoformat()
+
+
+def imap_since(iso_date: str) -> str:
+    day = date.fromisoformat(iso_date)
+    names = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
+    return f'{day.day:02d}-{names[day.month - 1]}-{day.year}'
+
+
+def sync(project: Path, prompt_credentials: bool = False, initial_latest: int = 0, history_months: int | None = None) -> str:
     initialize(project)
     path = output_dir(project) / CONFIG_NAME
     config = read_json(path)
@@ -338,7 +353,7 @@ def sync(project: Path, prompt_credentials: bool = False, initial_latest: int = 
     reports = []
     for index, (mailbox, latest, direction) in enumerate(folders):
         current = dict(config, mailbox=mailbox, _direction=direction)
-        reports.append(sync_one(project, initial_latest=latest, config_override=current, credentials=(username, password), reset_new=index == 0))
+        reports.append(sync_one(project, initial_latest=latest, config_override=current, credentials=(username, password), reset_new=index == 0, history_months=history_months))
     state = read_json(output_dir(project) / DATA_NAME)
     state['sync']['mailbox_reports'] = reports
     state['sync']['new_message_count'] = sum(bool(m.get('is_new')) for m in state['messages'])
@@ -347,7 +362,7 @@ def sync(project: Path, prompt_credentials: bool = False, initial_latest: int = 
     return '\n'.join(reports)
 
 
-def sync_one(project: Path, prompt_credentials: bool = False, initial_latest: int = 0, config_override: dict | None = None, credentials: tuple | None = None, reset_new: bool = True) -> str:
+def sync_one(project: Path, prompt_credentials: bool = False, initial_latest: int = 0, config_override: dict | None = None, credentials: tuple | None = None, reset_new: bool = True, history_months: int | None = None) -> str:
     initialize(project)
     workspace = output_dir(project)
     config = config_override or read_json(workspace / CONFIG_NAME)
@@ -371,38 +386,46 @@ def sync_one(project: Path, prompt_credentials: bool = False, initial_latest: in
         if client.select('"' + mailbox.replace('\\', '\\\\').replace('"', '\\"') + '"', readonly=True)[0] != "OK":
             raise RuntimeError("Unable to open mailbox in read-only mode")
         current_validity = uidvalidity(client)
-        all_uids = uid_list(client, "ALL")
+        # UID * returns at most the current highest UID, not the full history.
+        highest_uid = max(uid_list(client, "UID *"), default=0)
         box = state.setdefault("mailboxes", {}).get(source_id)
         for message in state.setdefault("messages", []) if reset_new else []:
             message["is_new"] = False
             for task in message.get("tasks", []):
                 task["is_new"] = False
         if box and int(box.get("uidvalidity", -1)) != current_validity:
-            state["mailboxes"][source_id] = {"host": host, "mailbox": mailbox, "uidvalidity": current_validity, "last_uid": max(all_uids, default=0)}
+            state["mailboxes"][source_id] = {"host": host, "mailbox": mailbox, "uidvalidity": current_validity, "last_uid": highest_uid}
             state["sync"] = {"status": "uidvalidity_reset", "updated_at": utc_now(), "message": "UIDVALIDITY changed; established a new safe baseline.", "new_message_count": 0, "new_task_count": 0}
             write_json(workspace / DATA_NAME, state)
             return state["sync"]["message"]
         if not box:
-            import_existing = bool(config.get("import_existing_on_first_sync", False))
-            if initial_latest > 0 and all_uids:
-                initial_last = all_uids[-initial_latest - 1] if len(all_uids) > initial_latest else 0
-                import_existing = True
-            else:
-                initial_last = 0 if import_existing else max(all_uids, default=0)
-            box = {"host": host, "mailbox": mailbox, "uidvalidity": current_validity, "last_uid": initial_last}
+            import_existing = history_months is not None or initial_latest > 0 or bool(config.get("import_existing_on_first_sync", True))
+            box = {"host": host, "mailbox": mailbox, "uidvalidity": current_validity, "last_uid": highest_uid}
             state["mailboxes"][source_id] = box
+            if import_existing:
+                box['history_since'] = history_cutoff(history_months or config.get('initial_history_months', 1))
+                if initial_latest > 0:
+                    box['history_limit'] = initial_latest
             if not import_existing:
                 state["sync"] = {"status": "baseline_ready", "updated_at": utc_now(), "message": "Established the current UID baseline; future runs read only new mail.", "new_message_count": 0, "new_task_count": 0}
                 write_json(workspace / DATA_NAME, state)
                 return state["sync"]["message"]
-        new_uids = [uid for uid in all_uids if uid > int(box["last_uid"])]
+        if history_months is not None:
+            box['history_since'] = history_cutoff(history_months)
+        cursor = int(box['last_uid'])
+        new_uids = [uid for uid in uid_list(client, f'UID {cursor + 1}:*') if uid > cursor] if highest_uid > cursor else []
+        if box.get('history_since'):
+            historical = uid_list(client, 'SINCE ' + imap_since(box['history_since']))
+            if box.get('history_limit'):
+                historical = historical[-int(box['history_limit']):]
+            new_uids = sorted(set(new_uids + historical))
         known = {item.get("message_key") for item in state["messages"]}
         new_messages, new_tasks = 0, 0
         advanced_uid = int(box["last_uid"])
         for uid in new_uids:
             key = f"{source_id}:{current_validity}:{uid}"
             if key in known:
-                advanced_uid = uid
+                advanced_uid = max(advanced_uid, uid)
                 continue
             status, data = client.uid("fetch", str(uid), "(BODY.PEEK[])")
             if status != "OK" or not data or not isinstance(data[0], tuple):
@@ -419,7 +442,10 @@ def sync_one(project: Path, prompt_credentials: bool = False, initial_latest: in
                 received = received.replace(tzinfo=timezone.utc)
             state["messages"].insert(0, {"message_key": key, "source_id": source_id, "uidvalidity": current_validity, "uid": uid, "is_new": True, "sender": sender, "recipients": recipients, "subject": subject, "received_at": received.isoformat(), "body_text": body[:80000], "attachments": attachments, "tasks": tasks, "recorded_at": utc_now()})
             state['messages'][0].update(mailbox=mailbox, direction=config.get('_direction', 'inbound'), message_id=str(parsed.get('Message-ID', '')), in_reply_to=str(parsed.get('In-Reply-To', '')), references=str(parsed.get('References', '')), review_required=True)
-            known.add(key); new_messages += 1; new_tasks += len(tasks); advanced_uid = uid
+            known.add(key); new_messages += 1; new_tasks += len(tasks); advanced_uid = max(advanced_uid, uid)
+        else:
+            box.pop('history_since', None)
+            box.pop('history_limit', None)
         box["last_uid"] = advanced_uid
         state["sync"] = {"status": "synced", "updated_at": utc_now(), "message": f"Scanned {len(new_uids)} new UID(s); recorded {new_messages} message(s) and extracted {new_tasks} task(s).", "new_message_count": new_messages, "new_task_count": new_tasks}
         write_json(workspace / DATA_NAME, state)
@@ -443,9 +469,12 @@ def main() -> int:
     parser.add_argument('--summary-limit', type=int, default=10)
     parser.add_argument("--prompt-credentials", action="store_true", help="prompt locally for missing IMAP credentials without storing them")
     parser.add_argument("--initial-latest", type=int, default=0, metavar="N", help="on the first sync only, import the latest N existing messages")
+    parser.add_argument('--history-months', type=int, help='Explicitly read/backfill this many calendar months; first sync defaults to one month')
     args = parser.parse_args()
     if args.initial_latest < 0:
         parser.error("--initial-latest must be zero or greater")
+    if args.history_months is not None and args.history_months < 1:
+        parser.error('--history-months must be a positive integer')
     if not args.init and not args.rebuild and not args.sync and not args.summary:
         parser.error("choose --init, --rebuild, or --sync")
     project = Path(args.project_dir).expanduser().resolve()
@@ -455,7 +484,7 @@ def main() -> int:
     if args.rebuild:
         print("\n".join(rebuild(project)))
     if args.sync:
-        print(sync(project, prompt_credentials=args.prompt_credentials, initial_latest=args.initial_latest))
+        print(sync(project, prompt_credentials=args.prompt_credentials, initial_latest=args.initial_latest, history_months=args.history_months))
     if args.summary:
         initialize(project)
         messages = read_json(output_dir(project) / DATA_NAME).get('messages', [])
