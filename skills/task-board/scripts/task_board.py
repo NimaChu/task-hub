@@ -58,7 +58,8 @@ def write_json(path: Path, value: dict) -> None:
 
 def write_text(path: Path, value: str) -> None:
     temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(value, encoding="utf-8", newline="\n")
+    with temporary.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(value)
     temporary.replace(path)
 
 
