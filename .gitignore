@@ -1,0 +1,19 @@
+# Publish allowlist: private runtime and editor data are excluded by default.
+/*
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/AGENTS.md
+!/skills/
+!/tests/
+!/.github/
+**/__pycache__/
+*.py[cod]
+*.tmp
+*.log
+*.bak*
+**/task-workspace/
+**/mail-task-workspace/
+**/.env
+**/.env.*
+**/.DS_Store

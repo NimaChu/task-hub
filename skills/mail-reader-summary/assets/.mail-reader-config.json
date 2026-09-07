@@ -1,0 +1,12 @@
+{
+  "host": "imap.example.com",
+  "port": 993,
+  "ssl": true,
+  "mailbox": "INBOX",
+  "username_env": "MAIL_TASK_IMAP_USER",
+  "password_env": "MAIL_TASK_IMAP_PASS",
+  "import_existing_on_first_sync": false,
+  "save_attachments": true,
+  "max_attachment_bytes": 26214400,
+  "max_extracted_text_chars": 40000
+}

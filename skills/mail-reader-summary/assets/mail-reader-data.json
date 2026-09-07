@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "mailboxes": {},
+  "messages": [],
+  "sync": {
+    "status": "not_started",
+    "updated_at": null,
+    "message": "尚未同步",
+    "new_message_count": 0,
+    "new_task_count": 0
+  }
+}

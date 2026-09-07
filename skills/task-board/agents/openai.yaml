@@ -1,0 +1,6 @@
+interface:
+  display_name: "Task Board"
+  short_description: "Turn prompts and channel information into visual tasks"
+  default_prompt: "Use $task-board to turn my described work into tasks, preserve its source, and open the local board."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Mail Reader Summary"
+  short_description: "Read email, summarize in text, and extract task requirements"
+  default_prompt: "Use $mail-reader-summary to read new mail and summarize requests, deadlines, and delivery evidence in text; a board is optional."
+policy:
+  allow_implicit_invocation: true
