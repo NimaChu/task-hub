@@ -4,7 +4,7 @@
 
 项目包含两个可独立安装的技能：
 
-- **mail-reader-summary**：只读同步 IMAP 收件箱和已发送邮件，按 UID 增量记录正文与附件，由 Agent 理解任务和交付证据；也可直接输出文本摘要。
+- **mail-reader-summary**：只读同步 IMAP 收件箱和已发送邮件，或免凭据导入客户端导出的 `.eml` 文件夹；增量记录正文与附件，由 Agent 理解任务和交付证据，也可直接输出文本摘要。
 - **task-board**：根据用户描述或结构化任务创建 JSON 数据库和自动载入的 HTML 看板，支持卡片拖动、优先级和截止日期调整，以及证据和附件查看。
 
 企业微信、Teams 是预留的来源类型，尚未接入。项目不包含大模型服务，语义理解由运行技能的 Agent 完成。
@@ -21,6 +21,8 @@
 
 Agent 应使用当前项目绝对路径作为 `--project-dir`，根据机器实际情况选择 Python。首次读取默认只读最近一个自然月，收件箱和启用的已发送文件夹使用相同范围。用户说“读取最近两个月”时，Agent 使用 `--history-months 2`；已经连接过的邮箱也能这样补读历史，按 UID 去重。`--initial-latest 10` 可进一步限制首次范围内最多读取 10 封。后续普通同步只读新增 UID。旧配置若明确设置仅建立基线，则保留该选择，显式历史参数可覆盖。
 
+数据源按“已验证连接 → 免凭据本地缓存/归档 → 导出 EML → IMAP”选择；能满足需求就停止升级。Thunderbird mbox 和 Apple Mail `.emlx` 可通过 `read_mail_archive.py` 导入，IMAP 仍是完整附件、已发送证据和持续增量同步的首选。
+
 ## 环境与命令
 
 需要 **Python 3.9+**、现代浏览器；核心脚本仅使用标准库，无需 npm、云数据库或额外 API Key。
@@ -36,6 +38,12 @@ macOS/Linux 可使用 `python3`；Windows 可使用 `py -3` 或有效的 Python 
 python skills/mail-reader-summary/scripts/read_mail.py --project-dir . --init
 # 由 Agent 配置生成的 config/mail-reader-config.json，再在本机运行：
 python skills/mail-reader-summary/scripts/read_mail.py --project-dir . --sync --prompt-credentials
+# 或导入 Foxmail/其他客户端导出的 EML（默认最近一个自然月）：
+python skills/mail-reader-summary/scripts/read_eml_folder.py --project-dir . --eml-dir "<导出目录>"
+# Thunderbird mbox / Apple Mail emlx：
+python skills/mail-reader-summary/scripts/read_mail_archive.py --discover
+# 项目内导出 Markdown、CSV 或精简 JSON 摘要：
+python skills/mail-reader-summary/scripts/export_mail_summary.py --project-dir . --format markdown
 ```
 
 模板使用占位服务器。连接前必须配置实际 IMAP 主机、端口和加密方式。网易企业邮箱用户通过[授权码申请页](https://mail.qiye.163.com/static/commonweb/authcode.html?p=qiye-authcode)获取客户端授权码；不要把密码或授权码发到聊天或写进命令。Windows 可选的图形输入工具需要 Tkinter；其他环境使用终端隐藏输入。Windows 用户环境变量持久化为可选项，变量并非加密存储。
@@ -74,6 +82,7 @@ task-workspace/            首次使用时生成；不进入 Git
 - 页面编辑保存在当前浏览器本地存储；换电脑前应导出修改后的 JSON。刷新页面不会连接邮箱，也不会将浏览器编辑直接写回磁盘。
 - 浏览器可打开普通附件。Foxmail 自定义 EML 协议仅在已注册的 Windows 机器启用；其他机器使用普通文件链接/下载。移动技能或 Python 路径后需重新注册。
 - IMAP 正文与附件读取可跨平台；本地 Foxmail 缓存适配器为实验性、版本相关能力。PDF、PPT、图片等附件可保存，但没有内置文本识别，需 Agent 的其他可用能力读取。
+- 通用 EML 导入会保留原始邮件和解码后的附件，并按内容哈希去重；专有 Outlook `.msg` 不属于 EML，当前不宣称支持。
 - Logo 与品牌设置通过工作区 `config/brand.json` 配置，缺省显示中性看板。
 
 ## 离线验证

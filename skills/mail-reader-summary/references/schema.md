@@ -6,7 +6,7 @@
 - `messages`: processed new-message records retained for provenance.
 - `sync`: most recent sync status and counts.
 
-Each message includes `message_key`, `source_id`, `uidvalidity`, `uid`, `is_new`, sender, recipients, subject, received time, body text, attachment metadata, and zero or more candidate `tasks`. Local Foxmail-cache records can additionally include `local_id`, `attachment_index_text`, `content_scope`, and `attachments_status`. Their attachment objects include `name`, `indexed_name`, `attachment_index`, `foxmail_container`, `container_position`, `encoded_size`, and `binary_status`; the container byte range is verified provenance, not an exported standalone file.
+Each message includes `message_key`, `source_id`, `uidvalidity`, `uid`, `is_new`, sender, recipients, subject, received time, body text, attachment metadata, and zero or more candidate `tasks`. Local Foxmail-cache records can additionally include `local_id`, `attachment_index_text`, `content_scope`, and `attachments_status`. Their attachment objects include `name`, `indexed_name`, `attachment_index`, `foxmail_container`, `container_position`, `encoded_size`, and `binary_status`; the container byte range is verified provenance, not an exported standalone file. Generic EML and supported local archives use a format-specific `source_type`, a SHA-256-based `message_key`, null UID fields, relative `source_file`, saved `eml_path`, and an auditable `date_basis`. Top-level `eml_sources` tracks their processed content hashes and older baseline hashes independently of IMAP cursors.
 
 Each candidate task includes:
 

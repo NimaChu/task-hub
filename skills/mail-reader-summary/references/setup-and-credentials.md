@@ -13,11 +13,11 @@ The reusable skill must not contain an actual user's address, installation path,
 
 ## Browser-assisted authorization code setup
 
-### Company onboarding: application link first
+### When IMAP is selected: application link first
 
-The intended users are company colleagues already using Foxmail with NetEase enterprise mail. Treat that as the onboarding context. Do not ask whether their mailbox is personal or enterprise, and do not start with instructions to enable IMAP/SMTP. Existing Foxmail service configuration is the starting point; revisit protocol settings only if a concrete connection failure requires it.
+The intended users are company colleagues already using Foxmail with NetEase enterprise mail. First follow [source routing](source-routing.md): a sufficient credential-free local read does not require IMAP setup. Once IMAP is selected because the user needs complete attachments, Sent evidence, missing server mail, or continuous incremental sync, do not ask whether their mailbox is personal or enterprise and do not start with instructions to enable IMAP/SMTP. Existing Foxmail service configuration is the starting point; revisit protocol settings only if a concrete connection failure requires it.
 
-1. First send [网易企业邮箱授权码申请](https://mail.qiye.163.com/static/commonweb/authcode.html?p=qiye-authcode). Ask the user to obtain a client authorization code through that page, completing any login/verification the page itself requests.
+1. For the first IMAP connection, send [网易企业邮箱授权码申请](https://mail.qiye.163.com/static/commonweb/authcode.html?p=qiye-authcode). Ask the user to obtain a client authorization code through that page, completing any login/verification the page itself requests.
 2. Prepare the reader command with the user's project path and an available Python runtime. Obtain non-secret account/server settings from the configured Foxmail account where available; ask only for missing information needed to identify that account.
 3. Have the user enter the code at the local hidden credential prompt after the command is running. Do not ask them to paste it into chat or enter it as a PowerShell command. The authorization code replaces the web-login password for this connection.
 

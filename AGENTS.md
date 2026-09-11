@@ -4,7 +4,7 @@ Turn information from any channel into human-readable, auditable, actionable tas
 
 ## Independent skills and routing
 
-- Use `skills/mail-reader-summary/SKILL.md` for email configuration, inbox/sent reading, attachments, UID history, and mail/task summaries. When only a text summary is requested, answer directly; no task board is required.
+- Use `skills/mail-reader-summary/SKILL.md` for email configuration, inbox/sent reading, generic EML-folder imports, attachments, UID history, and mail/task summaries. When only a text summary is requested, answer directly; no task board is required.
 - Use `skills/task-board/SKILL.md` for creating tasks from user prompts or structured channel information, managing task JSON/status, rendering and opening a local board. No mailbox skill or account is required.
 - Use both, reader then board, only for requested email-to-board workflows. Read the relevant SKILL.md completely before use.
 - Additional channel adapters should produce concrete task requirements and provenance using the shared task contract. Do not assume source-channel labels grant account access or provide an installed connector.
@@ -30,6 +30,8 @@ Turn information from any channel into human-readable, auditable, actionable tas
 - Follow the canonical per-field writing contract in `skills/task-board/SKILL.md` for every source channel. In particular, `assigner` is a human-readable person name or organizational role; keep email addresses and account identifiers only in provenance fields.
 - Email imports must not prune manual tasks or other channels.
 - First mailbox import defaults to the most recent calendar month, including enabled Sent folders. Honor explicit user history requests directly (e.g. `--history-months 2`); this is a soft default, not a hard cap. Use the same flag for later backfills without resetting UID history. Prefer server-side date filtering for large mailboxes; routine later syncs remain UID-incremental.
+- For credential-free portable imports, accept recursively exported RFC 822 `.eml` files, retain originals and decoded attachments in the workspace, and deduplicate by content hash. Do not treat proprietary Outlook `.msg` as EML or claim support without a verified parser.
+- Source priority is existing working connector, credential-free local cache/archive, exported EML, then read-only IMAP when completeness or continuity requires it. Do not force every user through each tier.
 
 ## Boundaries
 
